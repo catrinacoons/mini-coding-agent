@@ -24,10 +24,46 @@ intent.md - The problem, the desired outcome, constraints, open questions
 spec.md - Numbered requirements R1–R21, the design, areas of concern
 plan.md - Files that change, order of work (citing R#), risks, proof
 
-## How the skills componenet works
+## How the skills component works
 
-[TODO]
+The skills component from Lab 5 was integrated into the mini-coding-agent. The file structure within .claude was maintained; there was an addition of a lab/ folder containing the q_learning.py and vacuum_env.py that the mini coding agent utilizes.
+The flow of the AI agent:
+1. Starting from the intent.md, specs.md, and plan.md, the parent agent has the initial plan outlined with all of the instructions and conventions. Indicating that skills are reachable in the specified directories.
+2. The child agent inherits the instructions/workspace, thresholds, and maximum skills. This automatically matches the delegated tasks with the skills ask() -> check_skills().
+3. Then the activated skills write depth-aware JSONL events for each subagent.
 
+   - The user submits a prompt
+   - Skill discovery and matching: SkillLibrary ranks available skills against the prompt.
+   - Relevant skills activate: reward-design instructions become available to the agent.
+   - The Ollama model reasons about the task, deciding whether to read files, run tools, or answer.
+   - Tool execution, like read_file, run_shell, load_skill, or delegate.
+   - Final answer and logs, including the validation report plus JSONL skill events.
+
+  
+ ### File Structure
+ ```
+.claude/
+└── skills/
+│    ├── grid-validation/
+│    │   └── SKILL.md
+│    ├── transition-testing/
+│    │   └── SKILL.md
+│    └── reward-design/
+│        └── SKILL.md
+├──intent
+│  └── agent-skills/
+│      ├──intent.md
+│      ├──specs.md
+│      ├──plan.md
+├──lab/
+│    ├── q_learning.py
+│    ├── vacuum-env.py
+├──tests/
+│    ├── test_skills.py
+│    ├── test_mini_coding_agent.py
+│
+├── mini_coding_agent.py
+```
 ### Requirements are unchanged from original Mini-Coding_Agent directions
 
 &nbsp;
@@ -166,6 +202,100 @@ By default it uses:
 
 - model: `qwen3.5:4b`
 - approval: `ask`
+
+
+### Grid Validation
+
+Validates the vacuum robot's 4×4 grid, starting position, obstacle, pit, and goal.
+
+```bash
+python3 mini_coding_agent.py --model qwen3.5:4b --max-steps 15 \
+"Use grid-validation to check lab/vacuum_env.py. Read the file once. Verify the 4x4 grid, start (0,0), obstacle (1,1), pit (3,1), and goal (3,3). Do not use shell commands. Give a short PASS/FAIL report."
+```
+
+### Transition Testing
+
+Checks stochastic movement probabilities, boundary handling, obstacle blocking, and terminal EXIT behavior.
+
+```bash
+python3 mini_coding_agent.py --model qwen3.5:4b --max-steps 15 \
+"Use transition-testing to check lab/vacuum_env.py. Read the file once. Verify movement probabilities 0.8, 0.1, and 0.1, boundary handling, obstacle blocking, and EXIT behavior. Do not use shell commands. Give a short PASS/FAIL report."
+```
+
+### Reward Design
+
+Validates the reward structure, including the living reward, pit penalty, goal reward, and EXIT action.
+
+```bash
+python3 mini_coding_agent.py --model qwen3.5:4b --max-steps 15 \
+"Use reward-design to check lab/vacuum_env.py. Read the file once. Verify living reward -0.04, pit -1, goal +10, and EXIT behavior. Do not use shell commands. Give a short PASS/FAIL report."
+```
+
+### Run Q-Learning
+
+Runs the vacuum robot's Q-learning implementation directly.
+
+```bash
+python3 lab/q_learning.py
+```
+
+To have the agent execute Q-learning and summarize the results:
+
+```bash
+python3 mini_coding_agent.py --model qwen3.5:4b --max-steps 15 \
+"Use transition-testing to inspect lab/vacuum_env.py. Then run python3 lab/q_learning.py once using run_shell. Report the actual Q-learning results. Do not invent results or repeat commands."
+```
+
+### Run Automated Tests
+
+Run the complete test suite:
+
+```bash
+python3 -m pytest tests/ -v
+```
+
+Run only the agent skills tests:
+
+```bash
+python3 -m pytest tests/test_skills.py -v
+```
+
+The implementation previously passed all 24 automated tests.
+
+### View Skill Activation Logs
+
+The agent records skill matching and activation events in `.mini-coding-agent/skill_log.jsonl`.
+
+To view activated skills:
+
+```bash
+grep '"event": "skill_executed"' .mini-coding-agent/skill_log.jsonl
+```
+
+### Interactive Commands
+
+Start the agent:
+
+```bash
+python3 mini_coding_agent.py --model qwen3.5:4b
+```
+
+Inside the interactive agent, use `/skills` to list available skills or enter a natural-language task.
+
+Example:
+
+```text
+mini-coding-agent> Validate the vacuum robot grid using grid-validation.
+```
+
+### Notes
+
+- Skills are automatically selected based on prompt matching.
+- Focused prompts are generally more reliable with `qwen3.5:4b`.
+- The agent may request approval before running shell commands.
+- A skill activation message confirms selection, but successful task completion requires a final response.
+- The automated tests provide reproducible verification of the implementation.
+
 
 For a concrete usage example, see [EXAMPLE.md](EXAMPLE.md).
 
